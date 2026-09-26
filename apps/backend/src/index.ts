@@ -7,6 +7,7 @@ import { requestLogger } from "./middleware/requestLogger";
 import { corsMiddleware, helmetMiddleware } from "./middleware/security";
 import { authRateLimiter } from "./middleware/rateLimiter";
 import { errorHandler } from "./middleware/errorHandler";
+import { captureRawBody } from "./middleware/rawBody";
 import { healthRouter } from "./routes/health";
 import { listingsRouter } from "./routes/listings";
 import { savedSearchesRouter, watchlistRouter } from "./routes/listing-alerts";
@@ -16,17 +17,17 @@ import { refundsRouter } from "./routes/refunds";
 import { transfersRouter } from "./routes/transfers";
 import { changelogRouter } from "./routes/changelog";
 import { disputesRouter } from "./routes/disputes";
+// Issue #240 — account deletion / anonymization
+import { usersRouter } from "./routes/users";
 
 export function createApp(): Express {
   const app = express();
 
-  // Sentry request handler must be the very first middleware.
-  app.use(sentryRequestHandler());
-
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
   app.use(requestLogger);
-  app.use(express.json());
+  // Keep the raw bytes for HMAC-verified webhooks (see routes/webhooks.ts).
+  app.use(express.json({ verify: captureRawBody }));
   app.use("/api/auth", authRateLimiter);
   app.use("/health", healthRouter);
   app.use("/api/listings", listingsRouter);
@@ -41,6 +42,8 @@ export function createApp(): Express {
   app.use("/api/changelog", changelogRouter);
   // #156 — Dispute state machine
   app.use("/api/disputes", disputesRouter);
+  // #240 — Account deletion / anonymization
+  app.use("/api/users", usersRouter);
   app.use(errorHandler);
   return app;
 }
